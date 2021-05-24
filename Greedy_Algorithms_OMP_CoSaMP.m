@@ -1,15 +1,21 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%  CoSaMP ALGORITHM  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [x_sharp,current_iteration]= COSAMPL(A,y,m,N,s,M,x)
+%INPUTS: Sensing Matrix A, linear measurments y, dimensions of A (mxN),
+%sparsity s, solution x (to calculate rel err), nb_terations we want to
+%perform
+%OUTPUTS: X^# (approxiamtion vector), and current_iteration
+function [x_sharp, residual_plot, current_iteration]=COSAMP(A,y,m,N,s,nb_iterations,x)
 x_sharp=zeros(N,1);
+residual_plot=zeros(nb_iterations,1);
+% for k=1:nb_iterations
 current_iteration = 0;
 error=10;
 while (error > 10e-6) && (current_iteration<120)
     
     %CoSaMP 1: U^(n+1) = supp(x^n) Union L_2s(A*(y-Ax^n))
     residual=y-A*x_sharp;
-    U = union(find(x_sharp),L_s_M(A'*residual,2*s,M));
+    U = union(find(x_sharp),L_s(A'*residual,2*s));
     U = unique(U,'rows',"sorted");
     
     %CoSaMP 2: u^(n+1) in argmin{|y-Az|_2 : supp(z) subset U^(n+1)}
@@ -20,38 +26,8 @@ while (error > 10e-6) && (current_iteration<120)
     u = unrestrict_vector(z,U,N);
     
     %CoSaMP 3: x^(n+1) = H_s(u^(n+1))
-    H = L_s_M(u,s,M);
-    x_sharp = H_s_M(H,u,N);
-    %     residual_plot(k,1) = norm(A*x_sharp-y);
-    error=norm(x-x_sharp);
-    current_iteration=current_iteration+1;
-    %     residual_plot(k,1) = norm(x-x_sharp)/norm(x);
-end
-end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%  CoSaMPL ALGORITHM  %%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [x_sharp,current_iteration]= COSAMPL(A,y,m,N,s,M,x)
-x_sharp=zeros(N,1);
-current_iteration = 0;
-error=10;
-while (error > 10e-6) && (current_iteration<120)
-    
-    %CoSaMP 1: U^(n+1) = supp(x^n) Union L_2s(A*(y-Ax^n))
-    residual=y-A*x_sharp;
-    U = union(find(x_sharp),L_s_M(A'*residual,2*s,M));
-    U = unique(U,'rows',"sorted");
-    
-    %CoSaMP 2: u^(n+1) in argmin{|y-Az|_2 : supp(z) subset U^(n+1)}
-    A_U = restrict_matrix(A,U,m);
-    
-    z = A_U\y;
-    %     z = lsqr(A_U,y);
-    u = unrestrict_vector(z,U,N);
-    
-    %CoSaMP 3: x^(n+1) = H_s(u^(n+1))
-    H = L_s_M(u,s,M);
-    x_sharp = H_s_M(H,u,N);
+    H = L_s(u,s);
+    x_sharp = H_s(H,u,N);
     %     residual_plot(k,1) = norm(A*x_sharp-y);
     error=norm(x-x_sharp);
     current_iteration=current_iteration+1;
@@ -60,8 +36,46 @@ end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%  CoSaMPL ALGORITHM  %%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%INPUTS: Sensing Matrix A, linear measurments y, dimensions of A (mxN),
+%sparsity vector s, levels M, and solution x (to calculate rel err)
+%OUTPUTS: X^# (approxiamtion vector), and current_iteration
+function [x_sharp,current_iteration]= COSAMPL(A,y,m,N,s,M,x)
+x_sharp=zeros(N,1);
+current_iteration = 0;
+error=10;
+while (error > 10e-6) && (current_iteration<120)
+    
+    %CoSaMP 1: U^(n+1) = supp(x^n) Union L_2s(A*(y-Ax^n))
+    residual=y-A*x_sharp;
+    U = union(find(x_sharp),L_s_M(A'*residual,2*s,M));
+    U = unique(U,'rows',"sorted");
+    
+    %CoSaMP 2: u^(n+1) in argmin{|y-Az|_2 : supp(z) subset U^(n+1)}
+    A_U = restrict_matrix(A,U,m);
+    
+    z = A_U\y;
+    %     z = lsqr(A_U,y);
+    u = unrestrict_vector(z,U,N);
+    
+    %CoSaMP 3: x^(n+1) = H_s(u^(n+1))
+    H = L_s_M(u,s,M);
+    x_sharp = H_s_M(H,u,N);
+    %     residual_plot(k,1) = norm(A*x_sharp-y);
+    error=norm(x-x_sharp);
+    current_iteration=current_iteration+1;
+    %     residual_plot(k,1) = norm(x-x_sharp)/norm(x);
+end
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%  OMP ALGORITHM  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%INPUTS: Sensing Matrix A, linear measurments y, dimensions of A (mxN),nb_terations we want to
+%perform
+%OUTPUTS: X^# (approxiamtion vector), and current iteration k, and a plot
+%of the residual
+
 function [x_sharp, residual_plot,k] = OMP(A,y,N,m,nb_iterations)
 residual_plot=zeros(nb_iterations,1);
 residual=y;S=[];
@@ -83,6 +97,9 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%  OMPL ALGORITHM  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%INPUTS: Sensing Matrix A, linear measurments y, dimensions of A (mxN),
+%sparsity vector s, and levels M.
+%OUTPUTS: X^# (approxiamtion vector), and current iteration k
 function [x_sharp,k] = OMPL(A,y,s,M,m,N)
 residual=y;S=[];
 nb_iterations=sum(s,'all');
@@ -102,7 +119,7 @@ end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%  AUX ALGORITHM  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%  AUX FUNCTIONS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function plot_residuals_vs_iterations(residual,type)
@@ -114,7 +131,7 @@ xlabel('k iterations')
 ylabel('$\|y-Ax^{(k)}\|_2$','Interpreter','latex')
 end
 
-
+%L_{s,M} operator, selects s largest entries, of each level
 function max_index_set = L_s_M(z,s,M)
 M=union(0,M);
 max_index_set =zeros(sum(s,'all'),1);
@@ -135,7 +152,7 @@ end
 max_index_set=sort(max_index_set, 'ascend');
 end
 
-
+%argmax function for in levels, used in OMP only
 function [s,j] = argmax(z,s,M,S)
 M=union(0,M);
 for i=2:length(M)
@@ -172,7 +189,7 @@ for i=1:length(M)
 end
 end
 
-
+%checks coherance of the matrix A
 function coherance = check_coherance(A)
 dimension_A=size(A);
 j=1;
@@ -188,6 +205,7 @@ end
 coherance=M;
 end
 
+%check if matrix A staisfies the RIP of order s with a given RIC
 function RIC=check_RIP(RIC,A,x)
 if (1-RIC)*norm(x)^2 <=norm(A*x)^2 && norm(A*x)^2 <=  (1+RIC)*norm(x)^2
     RIC=true;   %(1)
@@ -195,7 +213,7 @@ else
     RIC=false;  %(0)
 end
 end
-
+%L_{s} operator, selects s largest entries
 function max_index_set = L_s(z,s)
 max_index_set =[];
 for i=1:s
@@ -208,6 +226,7 @@ end
 max_index_set=sort(max_index_set, 'ascend');
 end
 
+%Hard thresholding operator
 function x = H_s(H,u,N)
 x=zeros(N,1);
 for i=1:length(H)
@@ -215,6 +234,7 @@ for i=1:length(H)
 end
 end
 
+%fn to restrict a matrix
 function matrix_to_restrict = restrict_matrix(matrix, index_set,m)
 % index_set=index_set';
 matrix_to_restrict = zeros(m,length(index_set));
@@ -223,6 +243,7 @@ for i=1:length(index_set)
 end
 end
 
+%function to unrestrict a vector
 function vector_to_unrestrict =unrestrict_vector(vector,index_set,N)
 vector_to_unrestrict=zeros(N,1);
 for i=1:length(index_set)
@@ -230,6 +251,7 @@ for i=1:length(index_set)
 end
 end
 
+%fn to generate a random signal
 function y=generate_signal(m,N)
 y=zeros(m,1);
 for i=1:m
@@ -238,7 +260,7 @@ end
 
 end
 
-
+%Hard thresholding operator for in level model
 function x = H_s_M(H,u,N)
 x=zeros(N,1);
 for i=1:length(H)
